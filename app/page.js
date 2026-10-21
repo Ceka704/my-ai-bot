@@ -159,7 +159,7 @@ export default function Home() {
             </div>
             <div style={{ marginTop: '10px' }}>
               <label style={{ fontSize: '0.85rem', color: '#aaa' }}>Gönderilecek Miktar (TOKN)</label>
-              <input type="number" placeholder="Örn: 1000" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '5px', background: '#1a202c', border: '1px solid #444', color: '#fff' }} />
+              <input type="number" placeholder="Örn: 1000" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '5px', background: '#1a202c', border: '1px solid #444',color: '#fff' }} />
             </div>
             <button onClick={handleGiveTokens} style={{ marginTop: '43px', width: '100%', padding: '10px', background: '#e0b034', color: '#000', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>Test Tokeni Gönder</button>
           </div>
