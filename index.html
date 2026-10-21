@@ -1,86 +1,4 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lottery dApp</title>
-<!-- DOĞRU ethers.js adresi (önceki kodda adres yanlıştı) -->
-<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#14103a;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px;min-height:100vh}
-.wrap{max-width:560px;margin:0 auto}
-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-header h1{font-size:1.4rem}
-button{cursor:pointer;border:0;border-radius:8px;font-weight:700;padding:11px 16px;font-size:.95rem}
-.gold{background:#e0b034;color:#000}.green{background:#00d85a;color:#000}.grey{background:#2a2552;color:#fff}
-.card{background:#1d1850;border-radius:16px;padding:18px;margin-bottom:16px}
-.pool{text-align:center;font-size:2.6rem;font-weight:800;color:#e0b034}
-.sub{text-align:center;color:#aab;margin-top:4px}
-.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;font-size:.9rem;color:#ccd}
-.stats b{color:#fff}
-.balls{display:grid;grid-template-columns:repeat(9,1fr);gap:7px}
-.ball{aspect-ratio:1;border-radius:50%;background:#4b34b8;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;cursor:pointer;user-select:none}
-.ball.on{background:#e0b034;color:#000}
-.buy{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:14px}
-#msg{min-height:22px;text-align:center;font-size:.9rem;margin:8px 0}
-#admin{display:none}
-#admin h2{color:#ff5577;font-size:1.1rem;margin-bottom:12px}
-label{display:block;font-size:.8rem;color:#aab;margin:10px 0 4px}
-input{width:100%;padding:10px;border-radius:6px;border:1px solid #3a3470;background:#120e33;color:#fff}
-.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <header>
-    <h1>🔮 LOTTERY</h1>
-    <button id="connectBtn" class="gold" onclick="connect()">Cüzdanı Bağla</button>
-  </header>
-
-  <div class="card">
-    <div class="pool" id="pool">0</div>
-    <div class="sub">TOKN havuzda</div>
-    <div class="stats">
-      <div>Tur: <b id="round">-</b></div>
-      <div>Kalan süre: <b id="left">-</b></div>
-      <div>Bilet: <b id="price">-</b> TOKN</div>
-      <div>Bakiyem: <b id="bal">-</b> TOKN</div>
-      <div>Önceki kazanan sayı: <b id="prev">-</b></div>
-      <div>Ödülüm: <b id="claim">0</b> TOKN</div>
-    </div>
-    <div class="row"><button class="green" id="claimBtn" onclick="claimPrize()">Ödülü Çek</button></div>
-  </div>
-
-  <div class="card">
-    <div class="balls" id="balls"></div>
-    <div class="buy">
-      <span>Seçilen: <b id="cnt">0</b> • Toplam: <b id="cost">0</b> TOKN</span>
-      <button class="green" onclick="buy()">Bilet Al</button>
-    </div>
-  </div>
-
-  <div id="msg"></div>
-
-  <!-- Sadece kontrat sahibi (owner) cüzdanı bağlayınca görünür -->
-  <div class="card" id="admin">
-    <h2>⚙️ Admin Paneli</h2>
-    <label>Bilet fiyatı (TOKN)</label><input type="number" id="newPrice" value="5">
-    <label>Tur süresi (gün)</label><input type="number" id="newDays" value="7">
-    <label>Komisyon (%)</label><input type="number" id="newCom" value="8">
-    <div class="row">
-      <button class="gold" onclick="saveSettings()">Ayarları Kaydet</button>
-      <button class="grey" onclick="draw()">Çekilişi Yap</button>
-      <button class="grey" onclick="withdrawFees()">Komisyonu Çek</button>
-    </div>
-    <label>Test tokeni gönder: cüzdan adresi</label><input id="toAddr" placeholder="0x...">
-    <label>Miktar (TOKN)</label><input type="number" id="toAmt" value="1000">
-    <div class="row"><button class="gold" onclick="giveTokens()">Test Tokeni Gönder</button></div>
-  </div>
-</div>
-
-<script>
-// ======== BURAYI DOLDURUN ========
+// ================== SADECE BURAYI DOLDURUN ==================
 const CFG = {
   LOTTERY: "0xLOTTERY_KONTRAT_ADRESINIZ",
   TOKEN:   "0xTOKEN_ADRESINIZ",
@@ -92,14 +10,17 @@ const CFG = {
     blockExplorerUrls: ["https://testnet.bscscan.com"]
   }
 };
-// =================================
+// ============================================================
 
 const LOTTERY_ABI = [
   "function owner() view returns (address)",
   "function ticketPrice() view returns (uint256)",
+  "function duration() view returns (uint256)",
+  "function commission() view returns (uint256)",
   "function currentRound() view returns (uint256)",
   "function roundEnd() view returns (uint256)",
   "function pool() view returns (uint256)",
+  "function ownerFees() view returns (uint256)",
   "function winningNumber(uint256) view returns (uint256)",
   "function claimable(address) view returns (uint256)",
   "function buyTickets(uint256[] nums)",
@@ -113,33 +34,31 @@ const TOKEN_ABI = [
   "function balanceOf(address) view returns (uint256)",
   "function allowance(address,address) view returns (uint256)",
   "function approve(address,uint256) returns (bool)",
+  "function transfer(address,uint256) returns (bool)",
   "function mint(address,uint256)"
 ];
 
 const $ = id => document.getElementById(id);
-let me, lottery, token, dec = 18, price = 0n, roundEnd = 0;
-const selected = new Set();
+let me, lottery, token, dec = 18;
 
-function msg(t, err) { const m = $('msg'); m.textContent = t; m.style.color = err ? '#ff6688' : '#00e070'; }
+function msg(t, err) { const m = $('msg'); m.style.display = 'block'; m.textContent = t; m.style.color = err ? '#ff6688' : '#00e070'; }
 function errText(e) { return e.shortMessage || e.reason || e.message || String(e); }
 function fmt(v) { return Number(ethers.formatUnits(v, dec)).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+const setupOk = () => ethers.isAddress(CFG.LOTTERY) && ethers.isAddress(CFG.TOKEN);
 
-// 1-75 top matrisi
-for (let i = 1; i <= 75; i++) {
-  const b = document.createElement('div');
-  b.className = 'ball'; b.textContent = i;
-  b.onclick = () => { selected.has(i) ? selected.delete(i) : selected.add(i); b.classList.toggle('on'); updateCost(); };
-  $('balls').appendChild(b);
-}
-function updateCost() {
-  $('cnt').textContent = selected.size;
-  $('cost').textContent = fmt(price * BigInt(selected.size));
+// Normal tarayıcıda (Chrome vb.) cüzdan yoktur: cüzdan uygulamasında açma bağlantıları
+function walletHelp() {
+  const m = $('msg'); m.style.display = 'block'; m.style.color = '#ffcc66';
+  m.textContent = 'Bu tarayıcıda cüzdan yok. Sayfayı cüzdan uygulamasında açın: ';
+  [['MetaMask', 'https://metamask.app.link/dapp/' + location.host + location.pathname],
+   ['Trust Wallet', 'https://link.trustwallet.com/open_url?coin_id=20000714&url=' + encodeURIComponent(location.href)]]
+    .forEach(([t, h]) => { const a = document.createElement('a'); a.textContent = t + ' '; a.href = h; a.style.color = '#fff'; m.appendChild(a); });
 }
 
 async function connect() {
-  if (!window.ethereum) return msg('Cüzdan bulunamadı. MetaMask veya Trust Wallet tarayıcısını kullanın.', true);
-  if (!ethers.isAddress(CFG.LOTTERY) || !ethers.isAddress(CFG.TOKEN))
-    return msg('index.html içindeki CFG adreslerini kendi kontrat adreslerinizle değiştirin.', true);
+  if (typeof ethers === 'undefined') return msg('ethers.js yüklenemedi. İnterneti kontrol edip sayfayı yenileyin.', true);
+  if (!window.ethereum) return walletHelp();
+  if (!setupOk()) return msg('Kurulum eksik: app.js içindeki CFG.LOTTERY ve CFG.TOKEN hâlâ örnek değerde.', true);
   try {
     await window.ethereum.request({ method: 'eth_requestAccounts' });
     try {
@@ -148,78 +67,38 @@ async function connect() {
       if (e.code === 4902) await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [CFG.CHAIN] });
       else throw e;
     }
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
+    const signer = await new ethers.BrowserProvider(window.ethereum).getSigner();
     me = await signer.getAddress();
     lottery = new ethers.Contract(CFG.LOTTERY, LOTTERY_ABI, signer);
     token = new ethers.Contract(CFG.TOKEN, TOKEN_ABI, signer);
     dec = Number(await token.decimals());
-    const owner = await lottery.owner();
-    $('admin').style.display = owner.toLowerCase() === me.toLowerCase() ? 'block' : 'none';
     $('connectBtn').textContent = me.slice(0, 6) + '...' + me.slice(-4);
-    await load();
+    await refresh(); // her sayfa kendi refresh() fonksiyonunu tanımlar
     msg('Bağlandı ✔');
   } catch (e) { msg(errText(e), true); }
 }
 
-async function load() {
-  const [round, p, pool, end, bal, cl] = await Promise.all([
-    lottery.currentRound(), lottery.ticketPrice(), lottery.pool(), lottery.roundEnd(),
-    token.balanceOf(me), lottery.claimable(me)
-  ]);
-  price = p; roundEnd = Number(end);
-  $('round').textContent = round.toString();
-  $('price').textContent = fmt(p);
-  $('pool').textContent = fmt(pool);
-  $('bal').textContent = fmt(bal);
-  $('claim').textContent = fmt(cl);
-  $('prev').textContent = round > 1n ? (await lottery.winningNumber(round - 1n)).toString() : '-';
-  updateCost();
-}
-
-setInterval(() => {
-  if (!roundEnd) return;
-  const s = roundEnd - Math.floor(Date.now() / 1000);
-  if (s <= 0) { $('left').textContent = 'Tur bitti'; return; }
-  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
-  $('left').textContent = `${d}g ${h}s ${m}dk ${s % 60}sn`;
-}, 1000);
-
 // Her işlem için ortak sarmalayıcı
 async function run(label, fn) {
   if (!lottery) return msg('Önce cüzdanı bağlayın.', true);
-  try { msg(label + '...'); await fn(); msg('Başarılı ✔'); await load(); }
+  try { msg(label + '...'); await fn(); msg('Başarılı ✔'); await refresh(); }
   catch (e) { msg(errText(e), true); }
 }
 
-function buy() {
-  if (!selected.size) return msg('En az bir sayı seçin.', true);
-  run('Bilet alınıyor', async () => {
-    const nums = [...selected];
-    const total = price * BigInt(nums.length);
-    if ((await token.allowance(me, CFG.LOTTERY)) < total) {
-      msg('Token onayı bekleniyor (cüzdanda onaylayın)...');
-      await (await token.approve(CFG.LOTTERY, total)).wait();
-    }
-    await (await lottery.buyTickets(nums)).wait();
-    selected.clear();
-    document.querySelectorAll('.ball.on').forEach(b => b.classList.remove('on'));
-  });
-}
-const claimPrize = () => run('Ödül çekiliyor', async () => (await lottery.claim()).wait());
-const draw = () => run('Çekiliş yapılıyor', async () => (await lottery.drawWinner()).wait());
-const withdrawFees = () => run('Komisyon çekiliyor', async () => (await lottery.withdrawFees()).wait());
-const saveSettings = () => run('Ayarlar kaydediliyor', async () => {
-  const p = ethers.parseUnits($('newPrice').value.toString(), dec);
-  const d = BigInt(Math.round(Number($('newDays').value) * 86400));
-  const c = BigInt($('newCom').value);
-  await (await lottery.updateSettings(p, d, c)).wait();
-});
-const giveTokens = () => run('Test tokeni gönderiliyor', async () => {
-  const to = $('toAddr').value.trim() || me;
+// Cüzdanımdan başkasına token gönder (alıcı adresi + miktar)
+const sendToken = () => run('Token gönderiliyor', async () => {
+  const to = $('sendTo').value.trim();
   if (!ethers.isAddress(to)) throw new Error('Geçersiz cüzdan adresi');
-  await (await token.mint(to, ethers.parseUnits($('toAmt').value.toString(), dec))).wait();
+  const amt = ethers.parseUnits(($('sendAmt').value || '0').toString(), dec);
+  if (amt <= 0n) throw new Error('Miktar girin');
+  await (await token.transfer(to, amt)).wait();
+  $('sendTo').value = ''; $('sendAmt').value = '';
 });
-</script>
-</body>
-</html>
+
+window.addEventListener('load', async () => {
+  if (typeof ethers === 'undefined') return msg('ethers.js yüklenemedi. İnterneti kontrol edip sayfayı yenileyin.', true);
+  if (!setupOk()) return msg('Kurulum eksik: app.js içindeki CFG.LOTTERY ve CFG.TOKEN hâlâ örnek değerde.', true);
+  if (window.ethereum) { // cüzdan daha önce izin verdiyse otomatik bağlan
+    try { const a = await window.ethereum.request({ method: 'eth_accounts' }); if (a.length) connect(); } catch (e) {}
+  }
+});
